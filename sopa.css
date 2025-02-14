@@ -66,7 +66,8 @@
 .celda-sopa.seleccionada {
     background: #b3e5fc !important;
     transition: background 0.2s;
-    z-index: 3 !important; /* Asegurar que esté por encima de otros elementos */
+    z-index: 2 !important; /* Asegurar que esté por encima de otros elementos */
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
     position: relative;
 }
 
@@ -74,6 +75,15 @@
     background: #c8e6c9;
     position: relative;
     z-index: 1;
+}
+.celda-sopa.seleccionada:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 2px solid #2196F3;
+    border-radius: 3px;
+    pointer-events: none;
 }
 .celda-sopa.encontrada::after {
     content: '';

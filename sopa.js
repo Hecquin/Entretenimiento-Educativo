@@ -370,26 +370,43 @@ function iniciarSeleccion(x, y) {
 function moverSeleccion(x, y) {
   if (!seleccionando) return;
 
-  // Calcular todas las celdas entre el inicio y la posición actual
-  const celdas = obtenerCeldasEntrePuntos(inicioX, inicioY, x, y);
+  // Bloquear dirección después del primer movimiento
+  if (celdasSeleccionadas.length === 1) {
+    const dx = x - celdasSeleccionadas[0].x;
+    const dy = y - celdasSeleccionadas[0].y;
 
-  // Validar dirección consistente
-  if (!validarDireccionSeleccion(celdas)) {
-    document
-      .querySelectorAll(".celda-sopa")
-      .forEach((c) => c.classList.remove("seleccionada"));
-    return;
+    // Determinar dirección principal con tolerancia reducida
+    this.direccion = {
+      dx: Math.abs(dx) > Math.abs(dy) ? Math.sign(dx) : 0,
+      dy: Math.abs(dy) > Math.abs(dx) ? Math.sign(dy) : 0,
+    };
+
+    // Forzar dirección diagonal pura si el ángulo es cercano
+    if (Math.abs(dx) === Math.abs(dy)) {
+      this.direccion = { dx: Math.sign(dx), dy: Math.sign(dy) };
+    }
   }
 
-  // Limpiar selección anterior
-  document.querySelectorAll(".celda-sopa.seleccionada").forEach((celda) => {
-    if (!celdas.find((c) => c.x == celda.dataset.x && c.y == celda.dataset.y)) {
-      celda.classList.remove("seleccionada");
+  // Aplicar dirección bloqueada
+  const nuevasCeldas = obtenerCeldasDireccionales(
+    inicioX,
+    inicioY,
+    x,
+    y,
+    this.direccion
+  );
+
+  // Limpiar selección previa
+  document.querySelectorAll(".celda-sopa.seleccionada").forEach((c) => {
+    if (
+      !nuevasCeldas.some((nc) => nc.x == c.dataset.x && nc.y == c.dataset.y)
+    ) {
+      c.classList.remove("seleccionada");
     }
   });
 
-  // Agregar nueva selección
-  celdas.forEach(({ x, y }) => agregarSeleccion(x, y));
+  // Agregar nuevas celdas válidas
+  nuevasCeldas.forEach(({ x, y }) => agregarSeleccion(x, y));
 }
 //**************************************************************************** */
 function validarDireccionSeleccion(celdas) {
@@ -398,21 +415,21 @@ function validarDireccionSeleccion(celdas) {
   const dx = celdas[1].x - celdas[0].x;
   const dy = celdas[1].y - celdas[0].y;
 
-  // Permitir cualquier dirección válida (horizontal, vertical o diagonal)
-  const direccionValida =
-    Math.abs(dx) === Math.abs(dy) || // Diagonal
-    dx === 0 || // Vertical
-    dy === 0; // Horizontal
+  // Umbral de sensibilidad reducido
+  const deltaPermitido = 0; // Cero tolerancia a desviaciones
 
-  // Verificar consistencia en toda la selección
   for (let i = 2; i < celdas.length; i++) {
     const currentDx = celdas[i].x - celdas[i - 1].x;
     const currentDy = celdas[i].y - celdas[i - 1].y;
 
-    if (currentDx !== dx || currentDy !== dy) return false;
+    if (
+      Math.abs(currentDx - dx) > deltaPermitido ||
+      Math.abs(currentDy - dy) > deltaPermitido
+    ) {
+      return false;
+    }
   }
-
-  return direccionValida;
+  return true;
 }
 //**************************************************************************** */
 // Función para finalizar la selección
@@ -539,7 +556,30 @@ function marcarPalabraEncontrada(palabra) {
   });
 }
 //**************************************************************************** */
+function obtenerCeldasDireccionales(
+  xInicio,
+  yInicio,
+  xActual,
+  yActual,
+  direccion
+) {
+  const celdas = [];
+  const pasos = Math.max(
+    Math.abs(xActual - xInicio),
+    Math.abs(yActual - yInicio)
+  );
 
+  for (let i = 0; i <= pasos; i++) {
+    const x = xInicio + direccion.dx * i;
+    const y = yInicio + direccion.dy * i;
+
+    if (x >= 0 && x < TAMANO_GRILLA && y >= 0 && y < TAMANO_GRILLA) {
+      celdas.push({ x, y });
+    }
+  }
+  return celdas;
+}
+//**************************************************************************** */
 // Event listeners para mouse
 document
   .getElementById("contenedor-sopa")
@@ -575,12 +615,23 @@ document
     }
   });
 //**************************************************************************** */
+// En el event listener de touchmove, agregar:
 document.addEventListener("touchmove", (e) => {
   e.preventDefault();
   if (seleccionando) {
     const touch = e.touches[0];
+    // Aumentar precisión táctil
     const elementos = document.elementsFromPoint(touch.clientX, touch.clientY);
-    const celda = elementos.find((el) => el.classList.contains("celda-sopa"));
+    const celda = elementos.find((el) => {
+      const rect = el.getBoundingClientRect();
+      return (
+        el.classList.contains("celda-sopa") &&
+        touch.clientX >= rect.left + 10 &&
+        touch.clientX <= rect.right - 10 &&
+        touch.clientY >= rect.top + 10 &&
+        touch.clientY <= rect.bottom - 10
+      );
+    });
 
     if (celda) {
       moverSeleccion(parseInt(celda.dataset.x), parseInt(celda.dataset.y));
